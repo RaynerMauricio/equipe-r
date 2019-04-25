@@ -4,11 +4,12 @@ import glob
 import os
 
 listIDF = glob.glob("*.idf")
-epw = glob.glob("*.epw")
+listEPW = glob.glob("*.epw")
 
 conteudo = ""
 for i in listIDF:
-	conteudo = conteudo + os.getcwd()+"\\"+i+","+os.getcwd()+"\\"+epw[0]+","+os.getcwd()+"\\"+i[:-4]+",1\n"
+	for epw in listEPW:
+		conteudo = conteudo + os.getcwd()+"\\"+i+","+os.getcwd()+"\\"+epw+","+os.getcwd()+"\\"+epw[:-4]+"\\"+i[:-4]+",1\n"
 
 posicao = os.getcwd().rfind("\\")+1
 nome = os.getcwd()[posicao:]
