@@ -26,13 +26,14 @@ from dict_update import update
 import json
 from hive import hive
 import os
+import math
 
 SEED_DOOR_FILE = 'seed_door.json'
 EMS_PROGRAM_FILE = 'ems_program.json'
     
 def main(zone_area=8.85, zone_ratio=1.179, zone_height=2.5, azimuth=90,
     absorptance=.5, wall_u=4.083, wall_ct=165.6, ground=0, roof=1, 
-    shading=[0,0.5,0,0], living_room = False, exp=[1,1,0,0],
+    shading=[0,0.5,0,0], surrounding_shading = [0,0.5,0,0], living_room = False, exp=[1,1,0,0],
     wwr=[0,0.219,0,0], open_fac=[0,0.45,0,0], glass_fs=.87, equipment=0,
     lights = 5, bldg_ratio=0.85, floor_height=0, door=True, bound='hive',
     input_file='seed.json' , output='teste_model.epJSON',
@@ -54,6 +55,7 @@ def main(zone_area=8.85, zone_ratio=1.179, zone_height=2.5, azimuth=90,
     ## ground - Condition of exposure: 0 = Adiabatic, 1 = Outdoors.
     ## roof - Condition of exposure: 0 = Adiabatic, 1 = Outdoors.
     ## shading - the length of horizontal shading in meters.
+    ## surrounding_shading - The vertical angle of the permanent surrounding shading (building, tree, topograph...)
     ## living_room - Defines schedules for occupation: True = living 
     #  room occupation pattern, False = bedroom occupation pattern.
     ## exp - List with condition of exposure of walls: 0 = not exposed,
@@ -428,30 +430,70 @@ def main(zone_area=8.85, zone_ratio=1.179, zone_height=2.5, azimuth=90,
     for i in range(4):
         
         if wwr[i] > 0:
-
-            window_z1 = zone_height*(1-wwr[i])*.5
-            window_z2 = window_z1+(zone_height*wwr[i])
-            
+                        
             if i == 0:
-                window_x1 = zone_x*.999
-                window_x2 = zone_x*.001
+                
+                wallArea = zone_x*zone_height
+                windowArea = wallArea*wwr[i]
+                wallAspectRatio = zone_x/zone_height
+
+                largura = (windowArea*wallAspectRatio)**0.5
+                altura = windowArea/largura    
+                
+                window_x2 = (zone_x-largura)/2
+                window_x1 = zone_x - window_x2
                 window_y1 = zone_y
                 window_y2 = zone_y
+                window_z1 = (zone_height-altura)/2
+                window_z2 = zone_height - window_z1
+                
             elif i == 1:
+                
+                wallArea = zone_y*zone_height
+                windowArea = wallArea*wwr[i]
+                wallAspectRatio = zone_y/zone_height
+
+                largura = (windowArea*wallAspectRatio)**0.5
+                altura = windowArea/largura
+                
                 window_x1 = zone_x
                 window_x2 = zone_x
-                window_y1 = zone_y*.001
-                window_y2 = zone_y*.999
+                window_y1 = (zone_y-largura)/2
+                window_y2 = zone_y - window_y1
+                window_z1 = (zone_height-altura)/2
+                window_z2 = zone_height - window_z1
+                
             elif i == 2:
-                window_x1 = zone_x*.001
-                window_x2 = zone_x*.999
+            
+                wallArea = zone_x*zone_height
+                windowArea = wallArea*wwr[i]
+                wallAspectRatio = zone_x/zone_height
+
+                largura = (windowArea*wallAspectRatio)**0.5
+                altura = windowArea/largura
+                
+                window_x1 = (zone_x-largura)/2
+                window_x2 = zone_x - window_x1
                 window_y1 = 0
                 window_y2 = 0
+                window_z1 = (zone_height-altura)/2
+                window_z2 = zone_height - window_z1
+                
             else:
+            
+                wallArea = zone_x*zone_height
+                windowArea = wallArea*wwr[i]
+                wallAspectRatio = zone_y/zone_height
+
+                largura = (windowArea*wallAspectRatio)**0.5
+                altura = windowArea/largura
+                
                 window_x1 = 0
                 window_x2 = 0
-                window_y1 = zone_y*.999
-                window_y2 = zone_y*.001
+                window_y1 = (zone_y-largura)/2
+                window_y2 = zone_y - window_y1
+                window_z1 = (zone_height-altura)/2
+                window_z2 = zone_height - window_z1                
             
             model["FenestrationSurface:Detailed"]["window_"+str(i)] = {
                 "building_surface_name": "wall-"+str(i),
@@ -611,6 +653,82 @@ def main(zone_area=8.85, zone_ratio=1.179, zone_height=2.5, azimuth=90,
             ]
         }
          
+    #### SURROUNDING SHADING -------------------------------------------------------
+    
+    def shading(x0, y0, z0, x1, y1, z1, x2, y2, z2, x3, y3, z3):
+        return {
+            "idf_max_extensible_fields": 12,
+            "idf_max_fields": 15,
+            'transmittance_schedule_name': '',
+            'number_of_vertices': 4,
+            "vertices": [
+                {
+                "vertex_x_coordinate": x0,
+                "vertex_y_coordinate": y0,
+                "vertex_z_coordinate": z0
+                },
+                {
+                "vertex_x_coordinate": x1,
+                "vertex_y_coordinate": y1,
+                "vertex_z_coordinate": z1
+                },
+                {
+                "vertex_x_coordinate": x2,
+                "vertex_y_coordinate": y2,
+                "vertex_z_coordinate": z2
+                },
+                {
+                "vertex_x_coordinate": x3,
+                "vertex_y_coordinate": y3,
+                "vertex_z_coordinate": z3
+                }
+            ]
+        }
+
+    nearness = 10
+	
+    # checks if there is surrouding shading in model
+        
+    if surrounding_shading[0] > 0.01:
+        vertical_angle = surrounding_shading[0]
+        surheight = math.tan(vertical_angle*(math.pi/180))*10
+        surwidth = zone_x + nearness*2
+        model['Shading:Building:Detailed']['surrounding_shading_0'] = \
+        shading(zone_x/2 - surwidth/2, zone_y + nearness, surheight,
+                zone_x/2 - surwidth/2, zone_y + nearness, 0,
+                zone_x/2 + surwidth/2, zone_y + nearness, 0,
+                zone_x/2 + surwidth/2, zone_y + nearness, surheight)
+                
+    if surrounding_shading[1] > 0.01:
+        vertical_angle = surrounding_shading[1]
+        surheight = math.tan(vertical_angle*(math.pi/180))*10
+        surwidth = zone_y + nearness*2
+        model['Shading:Building:Detailed']['surrounding_shading_1'] = \
+        shading(zone_x + nearness, zone_y/2 + surwidth/2, surheight,
+                zone_x + nearness, zone_y/2 + surwidth/2, 0,
+                zone_x + nearness, zone_y/2 - surwidth/2, 0,
+                zone_x + nearness, zone_y/2 - surwidth/2, surheight)
+                
+    if surrounding_shading[2] > 0.01:
+        vertical_angle = surrounding_shading[2]
+        surheight = math.tan(vertical_angle*(math.pi/180))*10
+        surwidth = zone_x + nearness*2
+        model['Shading:Building:Detailed']['surrounding_shading_2'] = \
+        shading(zone_x/2 + surwidth/2, -nearness, surheight,
+                zone_x/2 + surwidth/2, -nearness, 0,
+                zone_x/2 - surwidth/2, -nearness, 0,
+                zone_x/2 - surwidth/2, -nearness, surheight)
+    
+    if surrounding_shading[3] > 0.01:
+        vertical_angle = surrounding_shading[3]
+        surheight = math.tan(vertical_angle*(math.pi/180))*10
+        surwidth = zone_y + nearness*2
+        model['Shading:Building:Detailed']['surrounding_shading_3'] = \
+        shading(-nearness, zone_y/2 - surwidth/2, surheight,
+                -nearness, zone_y/2 - surwidth/2, 0,
+                -nearness, zone_y/2 + surwidth/2, 0,
+                -nearness, zone_y/2 + surwidth/2, surheight)
+
     #### THERMAL LOADS -------------------------------------------------
     if living_room:
         model["ElectricEquipment"] = {
@@ -774,81 +892,81 @@ def main(zone_area=8.85, zone_ratio=1.179, zone_height=2.5, azimuth=90,
             os.system('del eplusout*')
             os.system('del sqlite.err')
 
- 
 main(zone_area=21.4398, zone_ratio=0.6985559566, zone_height=2.5, azimuth=0,
     absorptance=.5, wall_u=4.083, wall_ct=165.6,
-    ground=1, roof=1, shading=[0,0,0,0], living_room = True,
-    exp=[1,0,0,0], wwr=[0.0866425992,0,0,0], open_fac=[.45,0,0,0], glass_fs=.87, 
-    bldg_ratio=0.85, floor_height=0, door=True, bound='hive',
-    input_file='seed.json' , output='hive_12-04_floor1_roof1.epJSON')  #   3.87 x 5.54 
-   
+    ground=1, roof=1, shading=[1,0.5,2,0], surrounding_shading = [10,30,20,0], living_room = True, exp=[1,1,1,0],
+    wwr=[0.8,0.5,0.7,0], open_fac=[0.5,.45,0.7,0], glass_fs=.87, equipment=0,
+    lights = 5, bldg_ratio=0.85, floor_height=0, door=False, bound='hive',
+    input_file='seed.json' , output='simula\hive_12-04_floor1_roof1.epJSON')  #   3.87 x 5.54 
+
+'''    
 main(zone_area=21.4398, zone_ratio=0.6985559566, zone_height=2.5, azimuth=0,
     absorptance=.5, wall_u=4.083, wall_ct=165.6,
     ground=1, roof=0, shading=[0,0,0,0], living_room = True,
     exp=[1,0,0,0], wwr=[0.0866425992,0,0,0], open_fac=[.45,0,0,0], glass_fs=.87, 
     bldg_ratio=0.85, floor_height=0, door=True, bound='hive',
-    input_file='seed.json' , output='hive_12-04_floor1_roof0.epJSON')  #   3.87 x 5.54 
+    input_file='seed.json' , output='simula\hive_12-04_floor1_roof0.epJSON')  #   3.87 x 5.54 
    
 main(zone_area=21.4398, zone_ratio=0.6985559566, zone_height=2.5, azimuth=0,
     absorptance=.5, wall_u=4.083, wall_ct=165.6,
     ground=0, roof=1, shading=[0,0,0,0], living_room = True,
     exp=[1,0,0,0], wwr=[0.0866425992,0,0,0], open_fac=[.45,0,0,0], glass_fs=.87, 
     bldg_ratio=0.85, floor_height=0, door=True, bound='hive',
-    input_file='seed.json' , output='hive_12-04_floor0_roof1.epJSON')  #   3.87 x 5.54 
+    input_file='seed.json' , output='simula\hive_12-04_floor0_roof1.epJSON')  #   3.87 x 5.54 
    
 main(zone_area=21.4398, zone_ratio=0.6985559566, zone_height=2.5, azimuth=0,
     absorptance=.5, wall_u=4.083, wall_ct=165.6,
-    ground=0, roof=0, shading=[0,0,0,0], living_room = True,
+    ground=0, roof=0, shading=[1,0,0,0], living_room = True,
     exp=[1,0,0,0], wwr=[0.0866425992,0,0,0], open_fac=[.45,0,0,0], glass_fs=.87, 
     bldg_ratio=0.85, floor_height=3, door=True, bound='hive',
-    input_file='seed.json' , output='hive_12-04_floor0_roof0.epJSON')  #   3.87 x 5.54 
+    input_file='seed.json' , output='simula\hive_12-04_floor0_roof0.epJSON')  #   3.87 x 5.54 
    
 main(zone_area=21.4398, zone_ratio=0.6985559566, zone_height=2.5, azimuth=0,
     absorptance=.5, wall_u=4.083, wall_ct=165.6,
     ground=1, roof=1, shading=[0,0,0,0], living_room = True,
     exp=[1,0,0,0], wwr=[0.0866425992,0,0,0], open_fac=[.45,0,0,0], glass_fs=.87, 
     bldg_ratio=0.85, floor_height=3, door=True, bound='hive',
-    input_file='seed.json' , output='hive_12-04_pilotis.epJSON')  #   3.87 x 5.54 
-    
-
+    input_file='seed.json' , output='simula\hive_12-04_pilotis.epJSON')  #   3.87 x 5.54 
  
 main(zone_area=21.4398, zone_ratio=0.6985559566, zone_height=2.5, azimuth=0,
     absorptance=.5, wall_u=4.083, wall_ct=165.6,
     ground=1, roof=1, shading=[0,0,0,0], living_room = True,
     exp=[1,0,0,0], wwr=[0.0866425992,0,0,0], open_fac=[.45,0,0,0], glass_fs=.87, 
     bldg_ratio=0.85, floor_height=0, door=True, bound='double',
-    input_file='seed.json' , output='double_12-04_floor1_roof1.epJSON', construction='construction_tijolomacico_double.json')  #   3.87 x 5.54 
+    input_file='seed.json' , output='simula\double_12-04_floor1_roof1.epJSON', construction='construction_tijolomacico_double.json')  #   3.87 x 5.54 
    
 main(zone_area=21.4398, zone_ratio=0.6985559566, zone_height=2.5, azimuth=0,
     absorptance=.5, wall_u=4.083, wall_ct=165.6,
     ground=1, roof=0, shading=[0,0,0,0], living_room = True,
     exp=[1,0,0,0], wwr=[0.0866425992,0,0,0], open_fac=[.45,0,0,0], glass_fs=.87, 
     bldg_ratio=0.85, floor_height=0, door=True, bound='double',
-    input_file='seed.json' , output='double_12-04_floor1_roof0.epJSON', construction='construction_tijolomacico_double.json')  #   3.87 x 5.54 
+    input_file='seed.json' , output='simula\double_12-04_floor1_roof0.epJSON', construction='construction_tijolomacico_double.json')  #   3.87 x 5.54 
    
 main(zone_area=21.4398, zone_ratio=0.6985559566, zone_height=2.5, azimuth=0,
     absorptance=.5, wall_u=4.083, wall_ct=165.6,
     ground=0, roof=1, shading=[0,0,0,0], living_room = True,
     exp=[1,0,0,0], wwr=[0.0866425992,0,0,0], open_fac=[.45,0,0,0], glass_fs=.87, 
     bldg_ratio=0.85, floor_height=0, door=True, bound='double',
-    input_file='seed.json' , output='double_12-04_floor0_roof1.epJSON', construction='construction_tijolomacico_double.json')  #   3.87 x 5.54 
+    input_file='seed.json' , output='simula\double_12-04_floor0_roof1.epJSON', construction='construction_tijolomacico_double.json')  #   3.87 x 5.54 
    
 main(zone_area=21.4398, zone_ratio=0.6985559566, zone_height=2.5, azimuth=0,
     absorptance=.5, wall_u=4.083, wall_ct=165.6,
     ground=0, roof=0, shading=[0,0,0,0], living_room = True,
     exp=[1,0,0,0], wwr=[0.0866425992,0,0,0], open_fac=[.45,0,0,0], glass_fs=.87, 
     bldg_ratio=0.85, floor_height=3, door=True, bound='double',
-    input_file='seed.json' , output='double_12-04_floor0_roof0.epJSON', construction='construction_tijolomacico_double.json')  #   3.87 x 5.54 
+    input_file='seed.json' , output='simula\double_12-04_floor0_roof0.epJSON', construction='construction_tijolomacico_double.json')  #   3.87 x 5.54 
    
 main(zone_area=21.4398, zone_ratio=0.6985559566, zone_height=2.5, azimuth=0,
     absorptance=.5, wall_u=4.083, wall_ct=165.6,
     ground=1, roof=1, shading=[0,0,0,0], living_room = True,
     exp=[1,0,0,0], wwr=[0.0866425992,0,0,0], open_fac=[.45,0,0,0], glass_fs=.87, 
     bldg_ratio=0.85, floor_height=3, door=True, bound='double',
-    input_file='seed.json' , output='double_12-04_pilotis.epJSON', construction='construction_tijolomacico_double.json')  #   3.87 x 5.54 
+    input_file='seed.json' , output='simula\double_12-04_pilotis.epJSON', construction='construction_tijolomacico_double.json')  #   3.87 x 5.54 
     
 
-'''   
+
+
+### old   
 main(exp=[0,0,0,0], shading=[0,0,0,0], wwr=[0,0,0,0], open_fac=[0,0,0,0], output= "hive_test.epJSON")  # (input_file='seed_single_U-conc-eps.json')
 main(exp=[1,1,1,1], shading=[0,0,0,0], wwr=[1,0,0,0], open_fac=[.5,0,0,0], output= "ela_test.epJSON")  # (input_file='seed_single_U-conc-eps.json')
 
@@ -857,5 +975,5 @@ main(zone_area=21.4398, zone_ratio=0.6985559566, zone_height=2.5, azimuth=270,
     ground=1, roof=1, shading=[.5,0,0,0.5], living_room = True,
     exp=[1,0,0,1], wwr=[0.0866425992,0,0,0.15503875], open_fac=[.45,0,0,.45], glass_fs=.87, 
     bldg_ratio=0.85, floor_height=0, door=True, bound='hive',
-    input_file='seed.json' , output='test.epJSON')  #   3.87 x 5.54 
+    input_file='seed.json' , output='simula\test.epJSON')  #   3.87 x 5.54 
 ''' 
