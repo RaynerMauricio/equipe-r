@@ -62,7 +62,10 @@ def shadingjson(x0, y0, z0, x1, y1, z1, x2, y2, z2, x3, y3, z3):
 
 def main(zone_area=8.85, zone_ratio=1.179, zone_height=2.5, azimuth=90,
     absorptance=.5, wall_u=4.083, wall_ct=165.6, ground=0, roof=1, 
-    shading=[0,0.5,0,0], surrounding_shading = [0,0.5,0,0], living_room = False, exp=[1,1,0,0],
+    shading=[0,0.5,0,0], surrounding_shading = [0,30,0,0], nearness = 4,
+    surrounding_horizontal_left = [0,0,0,0], surrounding_horizontal_right = [0,0,0,0],
+    shading_vertical_left = [0,0,0,0], shading_vertical_right = [0,0,0,0],
+    living_room = False, exp=[1,1,0,0],
     wwr=[0,0.219,0,0], opening_type=[0,1,0,0], open_fac=[0,0.45,0,0], glass_fs=.87, equipment=0,
     lights = 5, bldg_ratio=0.85, floor_height=0, bound='hive',
     input_file='seed.json', output='teste_model.epJSON',
@@ -85,6 +88,7 @@ def main(zone_area=8.85, zone_ratio=1.179, zone_height=2.5, azimuth=90,
     ## roof - Condition of exposure: 0 = Adiabatic, 1 = Outdoors.
     ## shading - the length of horizontal shading in meters.
     ## surrounding_shading - The vertical angle of the permanent surrounding shading (building, tree, topograph...)
+    ## surrounding_horizontal_left and right are the horizontal angle in degree used to obtain the surrounding width
     ## living_room - Defines schedules for occupation: True = living 
     #  room occupation pattern, False = bedroom occupation pattern.
     ## exp - List with condition of exposure of walls: 0 = not exposed,
@@ -783,52 +787,130 @@ def main(zone_area=8.85, zone_ratio=1.179, zone_height=2.5, azimuth=90,
         }
          
     #### SURROUNDING SHADING -------------------------------------------------------
-    
-    nearness = 4
 
     # checks if there is surrouding shading in model
         
     if surrounding_shading[0] > 0.01:
         vertical_angle = surrounding_shading[0]
         surheight = math.tan(vertical_angle*(math.pi/180))*nearness
-        surwidth = zone_x #+ nearness*2
+        surwidthleft = math.tan(surrounding_horizontal_left[0]*(math.pi/180))*nearness
+        surwidthright = math.tan(surrounding_horizontal_right[0]*(math.pi/180))*nearness
         model['Shading:Building:Detailed']['surrounding_shading_0'] = \
-        shadingjson(zone_x/2 - surwidth/2, zone_y + nearness, surheight + floor_height,
-                zone_x/2 - surwidth/2, zone_y + nearness, 0 + floor_height,
-                zone_x/2 + surwidth/2, zone_y + nearness, 0 + floor_height,
-                zone_x/2 + surwidth/2, zone_y + nearness, surheight + floor_height)
+        shadingjson(-surwidthleft, zone_y + nearness, surheight + floor_height,
+                	-surwidthleft, zone_y + nearness, 0,
+                	zone_x + surwidthright, zone_y + nearness, 0,
+                	zone_x + surwidthright, zone_y + nearness, surheight + floor_height)
                 
     if surrounding_shading[1] > 0.01:
         vertical_angle = surrounding_shading[1]
         surheight = math.tan(vertical_angle*(math.pi/180))*nearness
-        surwidth = zone_y #+ nearness*2
+        surwidthleft = math.tan(surrounding_horizontal_left[1]*(math.pi/180))*nearness
+        surwidthright = math.tan(surrounding_horizontal_right[1]*(math.pi/180))*nearness
         model['Shading:Building:Detailed']['surrounding_shading_1'] = \
-        shadingjson(zone_x + nearness, zone_y/2 + surwidth/2, surheight + floor_height,
-                zone_x + nearness, zone_y/2 + surwidth/2, 0 + floor_height,
-                zone_x + nearness, zone_y/2 - surwidth/2, 0 + floor_height,
-                zone_x + nearness, zone_y/2 - surwidth/2, surheight + floor_height)
+        shadingjson(zone_x + nearness, zone_y + surwidthleft, surheight + floor_height,
+                	zone_x + nearness, zone_y + surwidthleft, 0,
+                	zone_x + nearness, -surwidthright, 0,
+                	zone_x + nearness, -surwidthright, surheight + floor_height)
                 
     if surrounding_shading[2] > 0.01:
         vertical_angle = surrounding_shading[2]
         surheight = math.tan(vertical_angle*(math.pi/180))*nearness
-        surwidth = zone_x #+ nearness*2
+        surwidthleft = math.tan(surrounding_horizontal_left[2]*(math.pi/180))*nearness
+        surwidthright = math.tan(surrounding_horizontal_right[2]*(math.pi/180))*nearness
         model['Shading:Building:Detailed']['surrounding_shading_2'] = \
-        shadingjson(zone_x/2 + surwidth/2, -nearness, surheight + floor_height,
-                zone_x/2 + surwidth/2, -nearness, 0 + floor_height,
-                zone_x/2 - surwidth/2, -nearness, 0 + floor_height,
-                zone_x/2 - surwidth/2, -nearness, surheight + floor_height)
+        shadingjson(zone_x + surwidthleft, -nearness, surheight + floor_height,
+                	zone_x + surwidthleft, -nearness, 0,
+                	-surwidthright, -nearness, 0,
+                	-surwidthright, -nearness, surheight + floor_height)
     
     if surrounding_shading[3] > 0.01:
         vertical_angle = surrounding_shading[3]
         surheight = math.tan(vertical_angle*(math.pi/180))*nearness
-        surwidth = zone_y #+ nearness*2
+        surwidthleft = math.tan(surrounding_horizontal_left[3]*(math.pi/180))*nearness
+        surwidthright = math.tan(surrounding_horizontal_right[3]*(math.pi/180))*nearness
         model['Shading:Building:Detailed']['surrounding_shading_3'] = \
-        shadingjson(-nearness, zone_y/2 - surwidth/2, surheight + floor_height,
-                -nearness, zone_y/2 - surwidth/2, 0 + floor_height,
-                -nearness, zone_y/2 + surwidth/2, 0 + floor_height,
-                -nearness, zone_y/2 + surwidth/2, surheight + floor_height)
+        shadingjson(-nearness, -surwidthleft, surheight + floor_height,
+                	-nearness, -surwidthleft, 0,
+                	-nearness, zone_y + surwidthright, 0,
+                	-nearness, zone_y + surwidthright, surheight + floor_height)
+
+
+	#### VERTICAL SHADING -------------------------------------------------------
+
+	## north
+
+    if shading_vertical_right[0] > 0.01:
+        vertical_right_len = math.tan(shading_vertical_right[0]*(math.pi/180))*zone_x
+        model['Shading:Building:Detailed']['shading_vertical_right_0'] = \
+        shadingjson(zone_x, zone_y + vertical_right_len, zone_height + floor_height,
+                	zone_x, zone_y + vertical_right_len, floor_height,
+                	zone_x, zone_y, floor_height,
+                	zone_x, zone_y, zone_height + floor_height)
+
+    if shading_vertical_left[0] > 0.01:
+        vertical_left_len = math.tan(shading_vertical_left[0]*(math.pi/180))*zone_x
+        model['Shading:Building:Detailed']['shading_vertical_left_0'] = \
+        shadingjson(0, zone_y, zone_height + floor_height,
+                	0, zone_y, floor_height,
+                	0, zone_y + vertical_left_len, floor_height,
+                	0, zone_y + vertical_left_len, zone_height + floor_height)
+
+    ## east
+
+    if shading_vertical_right[1] > 0.01:
+        vertical_right_len = math.tan(shading_vertical_right[1]*(math.pi/180))*zone_y
+        model['Shading:Building:Detailed']['shading_vertical_right_1'] = \
+        shadingjson(zone_x + vertical_right_len, 0, zone_height + floor_height,
+                	zone_x + vertical_right_len, 0, floor_height,
+                	zone_x, 0, floor_height,
+                	zone_x, 0, zone_height + floor_height)
+
+    if shading_vertical_left[1] > 0.01:
+        vertical_left_len = math.tan(shading_vertical_left[1]*(math.pi/180))*zone_y
+        model['Shading:Building:Detailed']['shading_vertical_left_1'] = \
+        shadingjson(zone_x, zone_y, zone_height + floor_height,
+                	zone_x, zone_y, floor_height,
+                	zone_x + vertical_left_len, zone_y, floor_height,
+                	zone_x + vertical_left_len, zone_y, zone_height + floor_height)
+
+    ## south
+
+    if shading_vertical_right[2] > 0.01:
+        vertical_right_len = math.tan(shading_vertical_right[2]*(math.pi/180))*zone_x
+        model['Shading:Building:Detailed']['shading_vertical_right_2'] = \
+        shadingjson(0, -vertical_right_len, zone_height + floor_height,
+                	0, -vertical_right_len, floor_height,
+                	0, 0, floor_height,
+                	0, 0, zone_height + floor_height)
+
+    if shading_vertical_left[2] > 0.01:
+        vertical_left_len = math.tan(shading_vertical_left[2]*(math.pi/180))*zone_x
+        model['Shading:Building:Detailed']['shading_vertical_left_0'] = \
+        shadingjson(zone_x, 0, zone_height + floor_height,
+                	zone_x, 0, floor_height,
+                	zone_x, -vertical_left_len, floor_height,
+                	zone_x, -vertical_left_len, zone_height + floor_height)
+
+	## west
+
+    if shading_vertical_right[3] > 0.01:
+        vertical_right_len = math.tan(shading_vertical_right[3]*(math.pi/180))*zone_y
+        model['Shading:Building:Detailed']['shading_vertical_right_3'] = \
+        shadingjson(-vertical_left_len, zone_y, zone_height + floor_height,
+                	-vertical_left_len, zone_y, floor_height,
+                	0, zone_y, floor_height,
+                	0, zone_y, zone_height + floor_height)
+
+    if shading_vertical_left[3] > 0.01:
+        vertical_left_len = math.tan(shading_vertical_left[3]*(math.pi/180))*zone_y
+        model['Shading:Building:Detailed']['shading_vertical_left_3'] = \
+        shadingjson(0, 0, zone_height + floor_height,
+                	0, 0, floor_height,
+                	-vertical_left_len, 0, floor_height,
+                	-vertical_left_len, 0, zone_height + floor_height)              	        
 
     #### THERMAL LOADS -------------------------------------------------
+
     if living_room:
         model["ElectricEquipment"] = {
             "equipment_loads": {
@@ -1010,12 +1092,14 @@ def main(zone_area=8.85, zone_ratio=1.179, zone_height=2.5, azimuth=90,
             os.system('del eplusout*')
             os.system('del sqlite.err')
 
-main(zone_area=21.4398, zone_ratio=0.6985559566, zone_height=2.5, azimuth=0,
-    absorptance=.5, wall_u=4.083, wall_ct=165.6,
-    ground=1, roof=1, shading=[0,1,1,0], surrounding_shading = [0,40,50,45], living_room = True, exp=[0,1,1,1],
-    wwr=[0,0.3,.6,0.2], opening_type=[0,1,0,1], open_fac=[0,.3,0.5,0.7], glass_fs=.87, equipment=0,
-    lights = 5, bldg_ratio=0.85, floor_height=10, bound='hive',
-    input_file='seed.json' , output='simula\hive_12-04_floor1_roof1.epJSON', construction='construction_tijolomacico_double.json', convert=False)  #   3.87 x 5.54 
+main(zone_area=21.4398, zone_ratio=0.6985559566, zone_height=2.5, azimuth=0, absorptance=.5,
+	wall_u=4.083, wall_ct=165.6, ground=1, roof=1, shading=[0,1,1,0], surrounding_shading = [0,40,50,45],
+	nearness = 10, surrounding_horizontal_left = [0,10,20,30], surrounding_horizontal_right = [0,10,15,5],
+    shading_vertical_left = [0,10,10,10], shading_vertical_right = [0,6,6,6],
+    living_room = True, exp=[0,1,1,1], wwr=[0,0.3,.6,0.2], opening_type=[0,1,0,1], open_fac=[0,.3,0.5,0.7],
+    glass_fs=.87, equipment=0, lights = 5, bldg_ratio=0.85, floor_height=10, bound='double',
+    input_file='seed.json' , output='simula/hive_12-04_floor1_roof1.epJSON',
+    construction='construction_tijolomacico_double.json', convert=False)  #   3.87 x 5.54 
 
 '''    
 main(zone_area=21.4398, zone_ratio=0.6985559566, zone_height=2.5, azimuth=0,
