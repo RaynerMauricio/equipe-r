@@ -152,25 +152,6 @@
             "idf_max_extensible_fields": 0,
             "idf_max_fields": 16,
             "width_factor_for_opening_factor_2": 0.6
-        },
-        "detailed_door": {
-            "air_mass_flow_coefficient_when_opening_is_closed": 5e-05,
-            "air_mass_flow_exponent_when_opening_is_closed": 0.65,
-            "discharge_coefficient_for_opening_factor_1": 0.001,
-            "discharge_coefficient_for_opening_factor_2": 0.6,
-            "extra_crack_length_or_height_of_pivoting_axis": 0.0,
-            "height_factor_for_opening_factor_1": 0.0,
-            "height_factor_for_opening_factor_2": 1.0,
-            "number_of_sets_of_opening_factor_data": 2,
-            "opening_factor_1": 0.0,
-            "opening_factor_2": 1.0,
-            "start_height_factor_for_opening_factor_1": 0.0,
-            "start_height_factor_for_opening_factor_2": 0.0,
-            "type_of_rectangular_large_vertical_opening_lvo_": "NonPivoted",
-            "width_factor_for_opening_factor_1": 0.0,
-            "idf_max_extensible_fields": 0,
-            "idf_max_fields": 16,
-            "width_factor_for_opening_factor_2": 0.6
         }
     },
     "Construction": {

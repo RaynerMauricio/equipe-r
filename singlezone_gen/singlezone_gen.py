@@ -28,15 +28,44 @@ from hive import hive
 import os
 import math
 
-SEED_DOOR_FILE = 'seed_door.json'
 EMS_PROGRAM_FILE = 'ems_program.json'
-    
+
+def shadingjson(x0, y0, z0, x1, y1, z1, x2, y2, z2, x3, y3, z3):
+    return {
+                "idf_max_extensible_fields": 12,
+                "idf_max_fields": 15,
+                'transmittance_schedule_name': '',
+                'number_of_vertices': 4,
+                "vertices": [
+                    {
+                    "vertex_x_coordinate": x0,
+                    "vertex_y_coordinate": y0,
+                    "vertex_z_coordinate": z0
+                    },
+                    {
+                    "vertex_x_coordinate": x1,
+                    "vertex_y_coordinate": y1,
+                    "vertex_z_coordinate": z1
+                    },
+                    {
+                    "vertex_x_coordinate": x2,
+                    "vertex_y_coordinate": y2,
+                    "vertex_z_coordinate": z2
+                    },
+                    {
+                    "vertex_x_coordinate": x3,
+                    "vertex_y_coordinate": y3,
+                    "vertex_z_coordinate": z3
+                    }
+                ]
+            }    
+
 def main(zone_area=8.85, zone_ratio=1.179, zone_height=2.5, azimuth=90,
     absorptance=.5, wall_u=4.083, wall_ct=165.6, ground=0, roof=1, 
     shading=[0,0.5,0,0], surrounding_shading = [0,0.5,0,0], living_room = False, exp=[1,1,0,0],
-    wwr=[0,0.219,0,0], open_fac=[0,0.45,0,0], glass_fs=.87, equipment=0,
-    lights = 5, bldg_ratio=0.85, floor_height=0, door=True, bound='hive',
-    input_file='seed.json' , output='teste_model.epJSON',
+    wwr=[0,0.219,0,0], opening_type=[0,1,0,0], open_fac=[0,0.45,0,0], glass_fs=.87, equipment=0,
+    lights = 5, bldg_ratio=0.85, floor_height=0, bound='hive',
+    input_file='seed.json', output='teste_model.epJSON',
     construction="", convert=False):
     
     ## Main function that creates the epJSON model.
@@ -61,13 +90,13 @@ def main(zone_area=8.85, zone_ratio=1.179, zone_height=2.5, azimuth=90,
     ## exp - List with condition of exposure of walls: 0 = not exposed,
     #  1 = exposed (Outdoors).
     ## wwr - List with WWR of the walls.
+    ## opening_type - 0 = window and 1 = door
     ## open_fac - List with the opening factors of windows.
     ## glass_fs - SHGC of the windows' glass.
     ## equipment - Equipment loads in Watts
     ## lights - Lights loads in Watts per square meters.
     ## bldg_ratio - The ratio of the reference building.
     ## floor_height - Distance from zone's floor to the ground in meters.
-    ## door - Condition to create or not a door in the zone.
     ## bound - String that defines the boundary condition of internal 
     #  walls. May be "hive", "double", or "adiabatic".
     ## input_file - The name of the seed file. The seed files contains
@@ -382,49 +411,51 @@ def main(zone_area=8.85, zone_ratio=1.179, zone_height=2.5, azimuth=90,
         "sun_exposure": "NoSun",
         "wind_exposure": "NoWind"
     }
-    
-    
+
     if sum(exp) < 4:
         model['AirflowNetwork:MultiZone:Zone'] = {}
-        model["AirflowNetwork:MultiZone:Surface:Crack"] = {    
-            'crack': {
-                "air_mass_flow_coefficient_at_reference_conditions": 0.01,
+        
+        model["AirflowNetwork:MultiZone:Surface:EffectiveLeakageArea"] = {
+            "ela": {
                 "air_mass_flow_exponent": 0.667,
+                "discharge_coefficient": 1.76,
+                "effective_leakage_area": 1.31,
+                "reference_pressure_difference": 1.84,
                 "idf_max_extensible_fields": 0,
-                "idf_max_fields": 4
+                "idf_max_fields": 5
             }
         }
-        hive_cracks = {}
+        
+        hive_elas = {}
         hive_externalnodes = {}
         
     for i in range(4):
         
         if exp[i] > 0:
             model["BuildingSurface:Detailed"]["wall-"+str(i)].update(exposed_wall)
+
         else:
+            # airflownetwork ela
             if bound == 'hive':
                 model["BuildingSurface:Detailed"]["wall-"+str(i)].update(hive_wall)
                 model["BuildingSurface:Detailed"]["wall-"+str(i)]["outside_boundary_condition_object"] = "hive_"+str(i)+"_wall-"+str((i+2)%4)
-                model["Zone"]["hive_" +str(i)], hive_afn, hive_surfaces, door_return = hive(i, zone_x, zone_y, zone_height,floor_height, ground, roof, door)
+                model["Zone"]["hive_" +str(i)], hive_afn, hive_surfaces = hive(i, zone_x, zone_y, zone_height,floor_height, ground, roof)
                 
                 afn_zone = hive_afn['zone']
-                cracks_return = hive_afn['cracks']
+                elas_return = hive_afn['elas']
                 externalnodes_return = hive_afn['nodes']
                 
                 model['AirflowNetwork:MultiZone:Zone'].update(afn_zone)
                 model["BuildingSurface:Detailed"].update(hive_surfaces)
-                hive_cracks.update(cracks_return)
+                hive_elas.update(elas_return)
                 hive_externalnodes.update(externalnodes_return)
-                
-                if len(door_return) > 0:
-                    hive_door = door_return
 
             elif bound == 'double' or bound == 'doublewall':
                 model["BuildingSurface:Detailed"]["wall-"+str(i)].update(exposed_wall)
                 model["BuildingSurface:Detailed"]["wall-"+str(i)]["construction_name"] = "wall_construction_double"
             else:
                 model["BuildingSurface:Detailed"]["wall-"+str(i)].update(adiabatic_wall)
-    
+
     #### FENESTRATION --------------------------------------------------
     model["FenestrationSurface:Detailed"] = {}
     for i in range(4):
@@ -435,39 +466,83 @@ def main(zone_area=8.85, zone_ratio=1.179, zone_height=2.5, azimuth=90,
                 
                 wallArea = zone_x*zone_height
                 windowArea = wallArea*wwr[i]
-                wallAspectRatio = zone_x/zone_height
+                wallAspectRatio = zone_height/zone_x
 
-                largura = (windowArea*wallAspectRatio)**0.5
-                altura = windowArea/largura    
-                
-                window_x2 = (zone_x-largura)/2
-                window_x1 = zone_x - window_x2
-                window_y1 = zone_y
-                window_y2 = zone_y
-                window_z1 = (zone_height-altura)/2
-                window_z2 = zone_height - window_z1
-                
+                altura = (windowArea*wallAspectRatio)**0.5
+                largura = windowArea/altura
+
+                if opening_type[i] == 0:
+                    window_x2 = (zone_x-largura)/2
+                    window_x1 = zone_x - window_x2
+                    window_y1 = zone_y
+                    window_y2 = zone_y                    
+                    window_z1 = (zone_height-altura)/2
+                    window_z2 = zone_height - window_z1
+
+                else:
+                    door_height = 2.1
+                    largura = windowArea/door_height
+
+                    if largura > zone_x:                        
+                        largura = windowArea/altura
+                        window_x2 = (zone_x-largura)/2
+                        window_x1 = zone_x - window_x2
+                        window_y1 = zone_y
+                        window_y2 = zone_y                        
+                        window_z1 = 0
+                        window_z2 = altura
+                    
+                    else:
+                        window_x2 = (zone_x - largura)/2
+                        window_x1 = zone_x - window_x2
+                        window_y1 = zone_y
+                        window_y2 = zone_y                   
+                        window_z1 = 0
+                        window_z2 = door_height               
+
             elif i == 1:
                 
                 wallArea = zone_y*zone_height
                 windowArea = wallArea*wwr[i]
-                wallAspectRatio = zone_y/zone_height
+                wallAspectRatio = zone_height/zone_y
 
-                largura = (windowArea*wallAspectRatio)**0.5
-                altura = windowArea/largura
-                
-                window_x1 = zone_x
-                window_x2 = zone_x
-                window_y1 = (zone_y-largura)/2
-                window_y2 = zone_y - window_y1
-                window_z1 = (zone_height-altura)/2
-                window_z2 = zone_height - window_z1
+                altura = (windowArea*wallAspectRatio)**0.5
+                largura = windowArea/altura
+
+                if opening_type[i] == 0:
+                    window_x1 = zone_x
+                    window_x2 = zone_x
+                    window_y1 = (zone_y-largura)/2
+                    window_y2 = zone_y - window_y1                    
+                    window_z1 = (zone_height-altura)/2
+                    window_z2 = zone_height - window_z1
+
+                else:
+                    door_height = 2.1
+                    largura = windowArea/door_height
+
+                    if largura > zone_x:                        
+                        largura = windowArea/altura
+                        window_x1 = zone_x
+                        window_x2 = zone_x
+                        window_y1 = (zone_y-largura)/2
+                        window_y2 = zone_y - window_y1                    
+                        window_z1 = 0
+                        window_z2 = altura
+                    
+                    else:
+                        window_x1 = zone_x
+                        window_x2 = zone_x
+                        window_y1 = (zone_y-largura)/2
+                        window_y2 = zone_y - window_y1                    
+                        window_z1 = 0
+                        window_z2 = door_height                
                 
             elif i == 2:
             
                 wallArea = zone_x*zone_height
                 windowArea = wallArea*wwr[i]
-                wallAspectRatio = zone_x/zone_height
+                wallAspectRatio = zone_height/zone_x
 
                 largura = (windowArea*wallAspectRatio)**0.5
                 altura = windowArea/largura
@@ -478,22 +553,76 @@ def main(zone_area=8.85, zone_ratio=1.179, zone_height=2.5, azimuth=90,
                 window_y2 = 0
                 window_z1 = (zone_height-altura)/2
                 window_z2 = zone_height - window_z1
+
+                altura = (windowArea*wallAspectRatio)**0.5
+                largura = windowArea/altura
+
+                if opening_type[i] == 0:
+                    window_x1 = (zone_x-largura)/2
+                    window_x2 = zone_x - window_x1
+                    window_y1 = 0
+                    window_y2 = 0
+                    window_z1 = (zone_height-altura)/2
+                    window_z2 = zone_height - window_z1
+
+                else:
+                    door_height = 2.1
+                    largura = windowArea/door_height
+
+                    if largura > zone_x:                        
+                        largura = windowArea/altura
+                        window_x1 = (zone_x-largura)/2
+                        window_x2 = zone_x - window_x1
+                        window_y1 = 0
+                        window_y2 = 0
+                        window_z1 = 0
+                        window_z2 = altura
+                    
+                    else:
+                        window_x1 = (zone_x-largura)/2
+                        window_x2 = zone_x - window_x1
+                        window_y1 = 0
+                        window_y2 = 0
+                        window_z1 = 0
+                        window_z2 = door_height               
                 
             else:
             
                 wallArea = zone_x*zone_height
                 windowArea = wallArea*wwr[i]
-                wallAspectRatio = zone_y/zone_height
+                wallAspectRatio = zone_height/zone_y
 
-                largura = (windowArea*wallAspectRatio)**0.5
-                altura = windowArea/largura
-                
-                window_x1 = 0
-                window_x2 = 0
-                window_y1 = (zone_y-largura)/2
-                window_y2 = zone_y - window_y1
-                window_z1 = (zone_height-altura)/2
-                window_z2 = zone_height - window_z1                
+                altura = (windowArea*wallAspectRatio)**0.5
+                largura = windowArea/altura
+
+                if opening_type[i] == 0:
+                    window_x1 = 0
+                    window_x2 = 0
+                    window_y2 = (zone_y-largura)/2
+                    window_y1 = zone_y - window_y2
+                    window_z1 = (zone_height-altura)/2
+                    window_z2 = zone_height - window_z1
+
+                else:
+                    door_height = 2.1
+                    largura = windowArea/door_height
+
+                    if largura > zone_x:                        
+                        largura = windowArea/altura
+                        window_x1 = 0
+                        window_x2 = 0
+                        window_y2 = (zone_y-largura)/2
+                        window_y1 = zone_y - window_y2
+                        window_z1 = 0
+                        window_z2 = altura
+                    
+                    else:
+                        window_x1 = 0
+                        window_x2 = 0
+                        window_y2 = (zone_y-largura)/2
+                        window_y1 = zone_y - window_y2
+                        window_z1 = 0
+                        window_z2 = door_height
             
             model["FenestrationSurface:Detailed"]["window_"+str(i)] = {
                 "building_surface_name": "wall-"+str(i),
@@ -655,79 +784,49 @@ def main(zone_area=8.85, zone_ratio=1.179, zone_height=2.5, azimuth=90,
          
     #### SURROUNDING SHADING -------------------------------------------------------
     
-    def shading(x0, y0, z0, x1, y1, z1, x2, y2, z2, x3, y3, z3):
-        return {
-            "idf_max_extensible_fields": 12,
-            "idf_max_fields": 15,
-            'transmittance_schedule_name': '',
-            'number_of_vertices': 4,
-            "vertices": [
-                {
-                "vertex_x_coordinate": x0,
-                "vertex_y_coordinate": y0,
-                "vertex_z_coordinate": z0
-                },
-                {
-                "vertex_x_coordinate": x1,
-                "vertex_y_coordinate": y1,
-                "vertex_z_coordinate": z1
-                },
-                {
-                "vertex_x_coordinate": x2,
-                "vertex_y_coordinate": y2,
-                "vertex_z_coordinate": z2
-                },
-                {
-                "vertex_x_coordinate": x3,
-                "vertex_y_coordinate": y3,
-                "vertex_z_coordinate": z3
-                }
-            ]
-        }
+    nearness = 4
 
-    nearness = 10
-	
     # checks if there is surrouding shading in model
         
     if surrounding_shading[0] > 0.01:
         vertical_angle = surrounding_shading[0]
-        surheight = math.tan(vertical_angle*(math.pi/180))*10
-        surwidth = zone_x + nearness*2
+        surheight = math.tan(vertical_angle*(math.pi/180))*nearness
+        surwidth = zone_x #+ nearness*2
         model['Shading:Building:Detailed']['surrounding_shading_0'] = \
-        shading(zone_x/2 - surwidth/2, zone_y + nearness, surheight,
-                zone_x/2 - surwidth/2, zone_y + nearness, 0,
-                zone_x/2 + surwidth/2, zone_y + nearness, 0,
-                zone_x/2 + surwidth/2, zone_y + nearness, surheight)
+        shadingjson(zone_x/2 - surwidth/2, zone_y + nearness, surheight + floor_height,
+                zone_x/2 - surwidth/2, zone_y + nearness, 0 + floor_height,
+                zone_x/2 + surwidth/2, zone_y + nearness, 0 + floor_height,
+                zone_x/2 + surwidth/2, zone_y + nearness, surheight + floor_height)
                 
     if surrounding_shading[1] > 0.01:
         vertical_angle = surrounding_shading[1]
-        surheight = math.tan(vertical_angle*(math.pi/180))*10
-        surwidth = zone_y + nearness*2
+        surheight = math.tan(vertical_angle*(math.pi/180))*nearness
+        surwidth = zone_y #+ nearness*2
         model['Shading:Building:Detailed']['surrounding_shading_1'] = \
-        shading(zone_x + nearness, zone_y/2 + surwidth/2, surheight,
-                zone_x + nearness, zone_y/2 + surwidth/2, 0,
-                zone_x + nearness, zone_y/2 - surwidth/2, 0,
-                zone_x + nearness, zone_y/2 - surwidth/2, surheight)
+        shadingjson(zone_x + nearness, zone_y/2 + surwidth/2, surheight + floor_height,
+                zone_x + nearness, zone_y/2 + surwidth/2, 0 + floor_height,
+                zone_x + nearness, zone_y/2 - surwidth/2, 0 + floor_height,
+                zone_x + nearness, zone_y/2 - surwidth/2, surheight + floor_height)
                 
     if surrounding_shading[2] > 0.01:
         vertical_angle = surrounding_shading[2]
-        surheight = math.tan(vertical_angle*(math.pi/180))*10
-        surwidth = zone_x + nearness*2
+        surheight = math.tan(vertical_angle*(math.pi/180))*nearness
+        surwidth = zone_x #+ nearness*2
         model['Shading:Building:Detailed']['surrounding_shading_2'] = \
-        shading(zone_x/2 + surwidth/2, -nearness, surheight,
-                zone_x/2 + surwidth/2, -nearness, 0,
-                zone_x/2 - surwidth/2, -nearness, 0,
-                zone_x/2 - surwidth/2, -nearness, surheight)
+        shadingjson(zone_x/2 + surwidth/2, -nearness, surheight + floor_height,
+                zone_x/2 + surwidth/2, -nearness, 0 + floor_height,
+                zone_x/2 - surwidth/2, -nearness, 0 + floor_height,
+                zone_x/2 - surwidth/2, -nearness, surheight + floor_height)
     
     if surrounding_shading[3] > 0.01:
         vertical_angle = surrounding_shading[3]
-        surheight = math.tan(vertical_angle*(math.pi/180))*10
-        surwidth = zone_y + nearness*2
+        surheight = math.tan(vertical_angle*(math.pi/180))*nearness
+        surwidth = zone_y #+ nearness*2
         model['Shading:Building:Detailed']['surrounding_shading_3'] = \
-        shading(-nearness, zone_y/2 - surwidth/2, surheight,
-                -nearness, zone_y/2 - surwidth/2, 0,
-                -nearness, zone_y/2 + surwidth/2, 0,
-                -nearness, zone_y/2 + surwidth/2, surheight)
+        shadingjson(-nearness, zone_y/2 - surwidth/2, surheight + floor_height,
+                -nearness, zone_y/2 - surwidth/2, 0 + floor_height,
+                -nearness, zone_y/2 + surwidth/2, 0 + floor_height,
+                -nearness, zone_y/2 + surwidth/2, surheight + floor_height)
 
     #### THERMAL LOADS -------------------------------------------------
     if living_room:
@@ -790,11 +889,12 @@ def main(zone_area=8.85, zone_ratio=1.179, zone_height=2.5, azimuth=90,
 
     if bound == 'hive':        
         model["AirflowNetwork:MultiZone:ExternalNode"] = hive_externalnodes
-        model["AirflowNetwork:MultiZone:Surface"] = hive_cracks
+        model["AirflowNetwork:MultiZone:Surface"] = hive_elas
+
     else:
         model["AirflowNetwork:MultiZone:ExternalNode"] = {}
         model["AirflowNetwork:MultiZone:Surface"] = {}
-    
+
     for i in range(4):
         if wwr[i] > 0:
             model["AirflowNetwork:MultiZone:Surface"]["AirflowNetwork:MultiZone:Surface "+str(i)] = {
@@ -824,6 +924,18 @@ def main(zone_area=8.85, zone_ratio=1.179, zone_height=2.5, azimuth=90,
             "idf_max_fields": 12
         })
         
+    model["AirflowNetwork:MultiZone:Surface"]["AirflowNetwork:MultiZone:Surface Door"] = {
+            "external_node_name": "",
+            "indoor_and_outdoor_enthalpy_difference_upper_limit_for_minimum_venting_open_factor": 300000.0,
+            "indoor_and_outdoor_temperature_difference_upper_limit_for_minimum_venting_open_factor": 100.0,
+            "leakage_component_name": "ela",
+            "surface_name": "",
+            "ventilation_control_mode": "NoVent",
+            "window_door_opening_factor_or_crack_factor": 1.0,
+            "idf_max_extensible_fields": 0,
+            "idf_max_fields": 12
+        }
+
     window_areas = []
     
     for i in range(4):
@@ -831,23 +943,29 @@ def main(zone_area=8.85, zone_ratio=1.179, zone_height=2.5, azimuth=90,
             window_areas.append(wwr[i] * open_fac[i] * zone_x)
         else:
             window_areas.append(wwr[i] * open_fac[i] * zone_y)
-            
-    if door:
-        with open(SEED_DOOR_FILE, 'r') as file:
-            seed_door = json.loads(file.read())
-        model["FenestrationSurface:Detailed"]["door"] =seed_door["door"]
-        model["AirflowNetwork:MultiZone:Surface"]["AirflowNetwork:MultiZone:Surface 5"] = seed_door["AirflowNetwork:MultiZone:Surface 5"]
-        if bound == 'hive':
-            model["AirflowNetwork:MultiZone:WindPressureCoefficientValues"] = cp_calc(bldg_ratio, azimuth=azimuth, window_areas=window_areas, cp_eq=False)            
-            model["FenestrationSurface:Detailed"].update(hive_door)   
-            
-        else:
-            model["AirflowNetwork:MultiZone:WindPressureCoefficientValues"] = cp_calc(bldg_ratio, azimuth=azimuth, window_areas=window_areas, cp_eq=True)
-            model["AirflowNetwork:MultiZone:Surface"]["AirflowNetwork:MultiZone:Surface 5"]["external_node_name"] = "door_Node"
-            model["AirflowNetwork:MultiZone:ExternalNode"]["door_Node"] = seed_door["door_Node"]
-    else:
+        
+        if exp[i] == 0:
+            model["AirflowNetwork:MultiZone:Surface"]["AirflowNetwork:MultiZone:Surface Door"]["surface_name"] = "wall-{}".format(i)
+            if bound != 'hive':
+                model["AirflowNetwork:MultiZone:ExternalNode"]["door_Node"] = { 
+                "idf_max_extensible_fields": 0,
+                "idf_max_fields": 5,
+                "symmetric_wind_pressure_coefficient_curve": "No",
+                "wind_angle_type": "Absolute",
+                "wind_pressure_coefficient_curve_name": "side_{}_coef".format(i)
+                }
+
+    for i in model["AirflowNetwork:MultiZone:ExternalNode"]:
+        model["AirflowNetwork:MultiZone:ExternalNode"][i]['external_node_height'] = floor_height*zone_height + zone_height/2
+
+    if bound == 'hive':
         model["AirflowNetwork:MultiZone:WindPressureCoefficientValues"] = cp_calc(bldg_ratio, azimuth=azimuth, window_areas=window_areas, cp_eq=False)
-    
+    else:     
+        elasinglesurfacename = model["AirflowNetwork:MultiZone:Surface"]["AirflowNetwork:MultiZone:Surface Door"]["surface_name"]
+        model["BuildingSurface:Detailed"][elasinglesurfacename]["outside_boundary_condition"] = "Outdoors"
+        model["AirflowNetwork:MultiZone:Surface"]["AirflowNetwork:MultiZone:Surface Door"]["external_node_name"] = "door_Node"
+        model["AirflowNetwork:MultiZone:WindPressureCoefficientValues"] = cp_calc(bldg_ratio, azimuth=azimuth, window_areas=window_areas, cp_eq=True)
+
     #### DEFINING CONSTRUCTION AND MATERIALS ---------------------------
         
     if len(construction) > 0:
@@ -864,14 +982,14 @@ def main(zone_area=8.85, zone_ratio=1.179, zone_height=2.5, azimuth=90,
     
     with open(EMS_PROGRAM_FILE, 'r') as file:
         ems_program = json.loads(file.read())
-        
+
     if living_room:
         model["EnergyManagementSystem:Program"]["ems_program"] = ems_program["living_room"]
     else:
         model["EnergyManagementSystem:Program"]["ems_program"] = ems_program["bedroom"]
-    
+
     #### BRING SEED TO MODEL -------------------------------------------
-    
+
     with open(input_file, 'r') as file:
         seed = json.loads(file.read())
 
@@ -894,10 +1012,10 @@ def main(zone_area=8.85, zone_ratio=1.179, zone_height=2.5, azimuth=90,
 
 main(zone_area=21.4398, zone_ratio=0.6985559566, zone_height=2.5, azimuth=0,
     absorptance=.5, wall_u=4.083, wall_ct=165.6,
-    ground=1, roof=1, shading=[1,0.5,2,0], surrounding_shading = [10,30,20,0], living_room = True, exp=[1,1,1,0],
-    wwr=[0.8,0.5,0.7,0], open_fac=[0.5,.45,0.7,0], glass_fs=.87, equipment=0,
-    lights = 5, bldg_ratio=0.85, floor_height=0, door=False, bound='hive',
-    input_file='seed.json' , output='simula\hive_12-04_floor1_roof1.epJSON')  #   3.87 x 5.54 
+    ground=1, roof=1, shading=[0,1,1,0], surrounding_shading = [0,40,50,45], living_room = True, exp=[0,1,1,1],
+    wwr=[0,0.3,.6,0.2], opening_type=[0,1,0,1], open_fac=[0,.3,0.5,0.7], glass_fs=.87, equipment=0,
+    lights = 5, bldg_ratio=0.85, floor_height=10, bound='hive',
+    input_file='seed.json' , output='simula\hive_12-04_floor1_roof1.epJSON', construction='construction_tijolomacico_double.json', convert=False)  #   3.87 x 5.54 
 
 '''    
 main(zone_area=21.4398, zone_ratio=0.6985559566, zone_height=2.5, azimuth=0,
@@ -962,9 +1080,6 @@ main(zone_area=21.4398, zone_ratio=0.6985559566, zone_height=2.5, azimuth=0,
     exp=[1,0,0,0], wwr=[0.0866425992,0,0,0], open_fac=[.45,0,0,0], glass_fs=.87, 
     bldg_ratio=0.85, floor_height=3, door=True, bound='double',
     input_file='seed.json' , output='simula\double_12-04_pilotis.epJSON', construction='construction_tijolomacico_double.json')  #   3.87 x 5.54 
-    
-
-
 
 ### old   
 main(exp=[0,0,0,0], shading=[0,0,0,0], wwr=[0,0,0,0], open_fac=[0,0,0,0], output= "hive_test.epJSON")  # (input_file='seed_single_U-conc-eps.json')

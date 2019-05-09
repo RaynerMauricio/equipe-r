@@ -1,26 +1,5 @@
 {
-    "door": {
-        "building_surface_name": "wall-2",
-        "construction_name": "door_construction",
-        "outside_boundary_condition_object": "hive_door",
-        "number_of_vertices": 4.0,
-        "surface_type": "Door",
-        "vertex_1_x_coordinate": 0.1,
-        "vertex_1_y_coordinate": 0,
-        "vertex_1_z_coordinate": 2.1,
-        "vertex_2_x_coordinate": 0.1,
-        "vertex_2_y_coordinate": 0,
-        "vertex_2_z_coordinate": 0.0,
-        "vertex_3_x_coordinate": 1.0,
-        "vertex_3_y_coordinate": 0,
-        "vertex_3_z_coordinate": 0.0,
-        "vertex_4_x_coordinate": 1.0,
-        "vertex_4_y_coordinate": 0,
-        "vertex_4_z_coordinate": 2.1,
-        "idf_max_extensible_fields": 0,
-        "idf_max_fields": 22
-    },
-    "AirflowNetwork:MultiZone:Surface 5": {
+    "AirflowNetwork:MultiZone:Surface Door": {
         "indoor_and_outdoor_enthalpy_difference_upper_limit_for_minimum_venting_open_factor": 300000.0,
         "indoor_and_outdoor_temperature_difference_upper_limit_for_minimum_venting_open_factor": 100.0,
         "leakage_component_name": "detailed_door",

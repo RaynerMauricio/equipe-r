@@ -1,7 +1,7 @@
 
 from dict_update import update
 
-def hive(wall_i=2, zone_x=5, zone_y=4, zone_height=3, floor_height=10, ground=1, roof=1, door=False):
+def hive(wall_i=2, zone_x=5, zone_y=4, zone_height=3, floor_height=10, ground=1, roof=1):
     # Creates the adjacent zone and its surfaces
     
     wall_blank = {
@@ -13,7 +13,7 @@ def hive(wall_i=2, zone_x=5, zone_y=4, zone_height=3, floor_height=10, ground=1,
     }
     
     afn_zone = {
-        "AirflowNetwork:MultiZone:Zone "+str(wall_i+1): {
+        "AirflowNetwork:MultiZone:Zone "+str(wall_i+2): {
             "idf_max_extensible_fields": 0,
             "idf_max_fields": 8,
             "idf_order": 78,
@@ -34,9 +34,8 @@ def hive(wall_i=2, zone_x=5, zone_y=4, zone_height=3, floor_height=10, ground=1,
     }
     
     hive_externalnodes = {}
-    hive_cracks = {}
+    hive_elas = {}
     hive_surfaces = {}
-    hive_door = {}
     
     ceiling_obj = {
             "zone_name": "hive_" +str(wall_i),
@@ -99,11 +98,11 @@ def hive(wall_i=2, zone_x=5, zone_y=4, zone_height=3, floor_height=10, ground=1,
             hive_surfaces["hive_"+str(wall_i)+"_wall-"+str(j)]["sun_exposure"] = "SunExposed"
             hive_surfaces["hive_"+str(wall_i)+"_wall-"+str(j)]["wind_exposure"] = "WindExposed"
             hive_surfaces["hive_"+str(wall_i)+"_wall-"+str(j)]["construction_name"] = "wall_construction"
-            hive_cracks["Surface_hive_"+str(wall_i)+"_wall-"+str(j)] = {
+            hive_elas["Surface_hive_"+str(wall_i)+"_wall-"+str(j)] = {
                 "external_node_name": "Node_hive_"+str(wall_i)+"_wall-"+str(j),
                 "indoor_and_outdoor_enthalpy_difference_upper_limit_for_minimum_venting_open_factor": 300000.0,
                 "indoor_and_outdoor_temperature_difference_upper_limit_for_minimum_venting_open_factor": 100.0,
-                "leakage_component_name": "crack",
+                "leakage_component_name": "ela",
                 "surface_name": "hive_"+str(wall_i)+"_wall-"+str(j)                
             }
             hive_externalnodes["Node_hive_"+str(wall_i)+"_wall-"+str(j)] = {
@@ -282,33 +281,8 @@ def hive(wall_i=2, zone_x=5, zone_y=4, zone_height=3, floor_height=10, ground=1,
         }
     ]
     
-    
-    
-    if wall_i == 2 and door:
-        hive_door["hive_door"] = {
-            "building_surface_name": "hive_2_wall-0",
-            "outside_boundary_condition_object": 'door',
-            "construction_name": "door_construction",
-            "number_of_vertices": 4.0,
-            "surface_type": "Door",
-            "vertex_1_x_coordinate": 1,
-            "vertex_1_y_coordinate": 0,
-            "vertex_1_z_coordinate": 2.1,
-            "vertex_2_x_coordinate": 1,
-            "vertex_2_y_coordinate": 0,
-            "vertex_2_z_coordinate": 0,
-            "vertex_3_x_coordinate": .1,
-            "vertex_3_y_coordinate": 0,
-            "vertex_3_z_coordinate": 0,
-            "vertex_4_x_coordinate": .1,
-            "vertex_4_y_coordinate": 0,
-            "vertex_4_z_coordinate": 2.1,
-            "idf_max_extensible_fields": 0,
-            "idf_max_fields": 22
-        }
-    
-    afn = {'cracks':hive_cracks,'zone':afn_zone, 'nodes': hive_externalnodes}
-    return(zone, afn, hive_surfaces, hive_door)
+    afn = {'elas':hive_elas,'zone':afn_zone, 'nodes': hive_externalnodes}
+    return(zone, afn, hive_surfaces)
 
 '''
 print(hive(wall_i=0, zone_x=5, zone_y=4, zone_height=3, floor_height=10, ground=1, roof=1))
