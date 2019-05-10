@@ -68,7 +68,7 @@ def main(zone_area=8.85, zone_ratio=1.179, zone_height=2.5, azimuth=90,
     shading_vertical_left_type = [0,0,0,0], shading_vertical_right_type = [0,0,0,0],
     living_room = False, exp=[1,1,0,0],
     wwr=[0,0.219,0,0], opening_type=[0,1,0,0], open_fac=[0,0.45,0,0], glass_fs=.87, equipment=0,
-    lights = 5, bldg_ratio=0.85, floor_height=0, bound='hive',
+    lights = 5, bldg_ratio=0.85, floor_height=0, ela_area = 0.7, equipment_hive = 100, bound='hive',
     input_file='seed.json', output='teste_model.epJSON',
     construction="", convert=False):
     
@@ -102,6 +102,7 @@ def main(zone_area=8.85, zone_ratio=1.179, zone_height=2.5, azimuth=90,
     ## lights - Lights loads in Watts per square meters.
     ## bldg_ratio - The ratio of the reference building.
     ## floor_height - Distance from zone's floor to the ground in meters.
+    ## ela_area - 0.7 = porta tipical aberta; 0.4333 = porta pequena aberta; porta fechada < 0.01
     ## bound - String that defines the boundary condition of internal 
     #  walls. May be "hive", "double", or "adiabatic".
     ## input_file - The name of the seed file. The seed files contains
@@ -422,10 +423,10 @@ def main(zone_area=8.85, zone_ratio=1.179, zone_height=2.5, azimuth=90,
         
         model["AirflowNetwork:MultiZone:Surface:EffectiveLeakageArea"] = {
             "ela": {
-                "air_mass_flow_exponent": 0.667,
-                "discharge_coefficient": 1.76,
-                "effective_leakage_area": 1.31,
-                "reference_pressure_difference": 1.84,
+                "air_mass_flow_exponent": 0.65,
+                "discharge_coefficient": 1,
+                "effective_leakage_area": ela_area,
+                "reference_pressure_difference": 4,
                 "idf_max_extensible_fields": 0,
                 "idf_max_fields": 5
             }
@@ -445,7 +446,22 @@ def main(zone_area=8.85, zone_ratio=1.179, zone_height=2.5, azimuth=90,
                 model["BuildingSurface:Detailed"]["wall-"+str(i)].update(hive_wall)
                 model["BuildingSurface:Detailed"]["wall-"+str(i)]["outside_boundary_condition_object"] = "hive_"+str(i)+"_wall-"+str((i+2)%4)
                 model["Zone"]["hive_" +str(i)], hive_afn, hive_surfaces = hive(i, zone_x, zone_y, zone_height,floor_height, ground, roof)
-                
+
+                model["ElectricEquipment"] = {
+                    "equipment_loads_hive_" +str(i): {
+                    "design_level": equipment_hive,
+                    "design_level_calculation_method": "EquipmentLevel",
+                    "end_use_subcategory": "General",
+                    "fraction_latent": 0,
+                    "fraction_lost": 0,
+                    "fraction_radiant": 0.3,
+                    "idf_max_extensible_fields": 0,
+                    "idf_max_fields": 11,
+                    "schedule_name": "livingroom_equipment",
+                    "zone_or_zonelist_name": "hive_" +str(i)
+                    }
+                }
+
                 afn_zone = hive_afn['zone']
                 elas_return = hive_afn['elas']
                 externalnodes_return = hive_afn['nodes']
@@ -506,6 +522,7 @@ def main(zone_area=8.85, zone_ratio=1.179, zone_height=2.5, azimuth=90,
                         window_z2 = altura                    
                     
                     else:
+                        largura = windowArea/door_height
                         window_x2 = (zone_x - largura)/2
                         window_x1 = zone_x - window_x2
                         window_y1 = zone_y
@@ -541,7 +558,7 @@ def main(zone_area=8.85, zone_ratio=1.179, zone_height=2.5, azimuth=90,
                     door_height = 2.1
                     largura = windowArea/door_height
 
-                    if largura > zone_x:                        
+                    if largura > zone_y:                        
                         largura = windowArea/altura
                         window_x1 = zone_x
                         window_x2 = zone_x
@@ -551,6 +568,7 @@ def main(zone_area=8.85, zone_ratio=1.179, zone_height=2.5, azimuth=90,
                         window_z2 = altura
                     
                     else:
+                        largura = windowArea/door_height
                         window_x1 = zone_x
                         window_x2 = zone_x
                         window_y1 = (zone_y-largura)/2
@@ -596,6 +614,7 @@ def main(zone_area=8.85, zone_ratio=1.179, zone_height=2.5, azimuth=90,
                         window_z2 = altura
 
                     else:
+                        largura = windowArea/door_height
                         window_x1 = (zone_x-largura)/2
                         window_x2 = zone_x - window_x1
                         window_y1 = 0
@@ -612,7 +631,7 @@ def main(zone_area=8.85, zone_ratio=1.179, zone_height=2.5, azimuth=90,
 
             else:
             
-                wallArea = zone_x*zone_height
+                wallArea = zone_y*zone_height
                 windowArea = wallArea*wwr[i]
                 wallAspectRatio = zone_height/zone_y
 
@@ -631,7 +650,7 @@ def main(zone_area=8.85, zone_ratio=1.179, zone_height=2.5, azimuth=90,
                     door_height = 2.1
                     largura = windowArea/door_height
 
-                    if largura > zone_x:                        
+                    if largura > zone_y:                        
                         largura = windowArea/altura
                         window_x1 = 0
                         window_x2 = 0
@@ -641,6 +660,7 @@ def main(zone_area=8.85, zone_ratio=1.179, zone_height=2.5, azimuth=90,
                         window_z2 = altura
                     
                     else:
+                        largura = windowArea/door_height
                         window_x1 = 0
                         window_x2 = 0
                         window_y2 = (zone_y-largura)/2
@@ -1055,8 +1075,7 @@ def main(zone_area=8.85, zone_ratio=1.179, zone_height=2.5, azimuth=90,
     #### THERMAL LOADS -------------------------------------------------
 
     if living_room:
-        model["ElectricEquipment"] = {
-            "equipment_loads": {
+        model["ElectricEquipment"]["equipment_loads"] = {
                 "design_level": equipment,
                 "design_level_calculation_method": "EquipmentLevel",
                 "end_use_subcategory": "General",
@@ -1068,7 +1087,6 @@ def main(zone_area=8.85, zone_ratio=1.179, zone_height=2.5, azimuth=90,
                 "schedule_name": "livingroom_equipment",
                 "zone_or_zonelist_name": "room"
             }
-        }
 
     model["Lights"] = {
         "lights": {
@@ -1236,12 +1254,12 @@ def main(zone_area=8.85, zone_ratio=1.179, zone_height=2.5, azimuth=90,
             os.system('del sqlite.err')
 
 main(zone_area=21.4398, zone_ratio=0.6985559566, zone_height=2.5, azimuth=0, absorptance=.5,
-    wall_u=4.083, wall_ct=165.6, ground=1, roof=1, shading=[0,1,1,0], shading_type=[0,1,1,0], surrounding_shading = [0,40,50,45],
+    wall_u=4.083, wall_ct=165.6, ground=1, roof=1, shading=[0,1,1,0], shading_type=[0,1,0,0], surrounding_shading = [0,40,50,45],
     nearness = 10, surrounding_horizontal_left = [0,10,20,30], surrounding_horizontal_right = [0,10,15,5],
     shading_vertical_left = [0,10,10,10], shading_vertical_right = [0,6,6,6],
-    shading_vertical_left_type = [0,1,1,1], shading_vertical_right_type = [0,1,1,1],
-    living_room = True, exp=[0,1,1,1], wwr=[0,0.3,.6,0.2], opening_type=[0,1,0,1], open_fac=[0,.3,0.5,0.7],
-    glass_fs=.87, equipment=0, lights = 5, bldg_ratio=0.85, floor_height=10, bound='double',
+    shading_vertical_left_type = [0,1,0,1], shading_vertical_right_type = [0,1,0,1],
+    living_room = False, exp=[0,1,1,1], wwr=[0,.75,.2,.4], opening_type=[0,1,0,1], open_fac=[0,.3,0.5,0.7],
+    glass_fs=.87, equipment=0, lights = 5, bldg_ratio=0.85, floor_height=10, ela_area = 0.7, equipment_hive = 100, bound='hive',
     input_file='seed.json' , output='simula/hive_12-04_floor1_roof1.epJSON',
     construction='construction_tijolomacico_double.json', convert=False)  #   3.87 x 5.54 
 
